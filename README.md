@@ -22,3 +22,9 @@ yarn lint
 
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).
+
+
+### "gh-pages" helps you publish page as github page
+```
+npm run deploy
+```

@@ -1,0 +1,16 @@
+{
+    // vue format setting [https://marketplace.visualstudio.com/items?itemName=octref.vetur]
+    "vetur.format.options.tabSize": 2,
+    "vetur.format.defaultFormatter.html": "prettyhtml",
+    "vetur.format.defaultFormatter.js": "prettier",
+    "vetur.format.defaultFormatterOptions": {
+        "prettyhtml": {
+            "printWidth": 150
+        },
+        "prettier": {
+            "printWidth": 120
+        }
+    },
+    // Characters that will be used as word separators when doing word related navigations or operations
+    "editor.wordSeparators": "./\\()\"':,.;~!^&*|+=[]{}`~??<>",
+}
