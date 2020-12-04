@@ -18,7 +18,27 @@
         <span v-else>啟動定位</span>
       </button>
     </div>
-    <div id="split-data-container"></div>
+    <div id="split-data-container" v-if="wavesurfer && wavesurfer.backend.buffer">
+      <table>
+        <thead>
+          <tr>
+            <th>From</th>
+            <th>To</th>
+            <th>Total Sec.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="re in analyzeAduioParagraphResult" :key="re.index">
+            <td>{{re.startTime}}</td>
+            <td>{{re.endTime}}</td>
+            <td>{{re.during}}</td>
+            <td>
+              <button type="button" @click="playFromTimeToTime(re.startTime, re.endTime)">播放</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -33,13 +53,18 @@ export default {
       wavesurfer: null,
       peakSizePerSec: 40,
       audioPeakData: [],
-      audioUrl: "https://www.mfiles.co.uk/mp3-downloads/gs-cd-track2.mp3",
+      audioUrl:
+        "https://stitcher.acast.com/livestitches/MTFBRjRFMUUtNjhCRi00MEFFLUJCQTRBMEMxQjNBNUY1Q0I=/f4d291fbf2aee915622fa5ce03f3b67d.mp3?ci=NZ32SCWYv2Zzy-sQo0jQlJjELe2yS_XABLwfqSvhzzgYCKnZUA2S6Q%3D%3D&pf=rss&range=bytes%3D0-&sv=sphinx%401.42.2&uid=c18ecc397c9a658b6b0fdaf1297d999e&Expires=1620033876&Signature=NGXOldiJfosLXcbkIFDDjWO%7EUFteynpvoagVOVj9X0v2ch3xPu8-Txyu-F%7EXApGgXw5s7fpt5zas1kTmsiB6FCXKhm87CG%7EHzUNqkV3ixNzU7Tm%7EGT-Abf%7EcHpX9V6aWAyWfatFY%7EICK3LyEFZZVOxXfzYcWLEomHsNYkQkgE94WzrJ9kxicjqyxDe16xNPioWTeUwatZAHhdF62MVUaVHKnT9qQPzFKxRYiQ6JESLz3EtusTt2ErOMedwHlZODYAzFpqzie%7ELJoVfqzsOMGBisCZIuqbzainmtvRnkPYMBKRexeKtbzzflI58Ensaex-g97pcyywEeA6T%7E8Fcs7bA__&Key-Pair-Id=APKAJXAFARUOTJQ3BLOQ",
       isKeepUpdatePosition: true,
       isNowPlaying: false,
+      analyzeAduioParagraphResult: [],
     };
   },
   mounted() {
     this.initCreateWaveSurfer();
+  },
+  beforeDestroy() {
+    this.clearAllInterval();
   },
   methods: {
     initCreateWaveSurfer() {
@@ -87,11 +112,13 @@ export default {
         console.debug(data.length);
         this.audioPeakData = data;
         this.wavesurfer = wavesurfer;
+        this.analyzeAduioParagraph();
       });
     },
     setWavesurferOnPause() {
       this.wavesurfer.on("pause", () => {
         console.debug("pause");
+        this.isNowPlaying = false;
         this.clearAllInterval();
       });
     },
@@ -103,9 +130,11 @@ export default {
       });
     },
     setKeepUpdatePositionInterval() {
-      this.$options.keepUpdatingTogglePosition = setInterval(() => {
-        this.toogleToNowPosition();
-      }, 10);
+      if (!this.$options.keepUpdatingTogglePosition) {
+        this.$options.keepUpdatingTogglePosition = setInterval(() => {
+          this.toogleToNowPosition();
+        }, 10);
+      }
     },
     toogleToNowPosition() {
       let audioTotalTime = this.wavesurfer.backend.buffer.duration;
@@ -119,6 +148,7 @@ export default {
     },
     clearAllInterval() {
       clearInterval(this.$options.keepUpdatingTogglePosition);
+      this.$options.keepUpdatingTogglePosition = null;
     },
     switchKeepUpdatePosition() {
       if (this.isKeepUpdatePosition) {
@@ -134,6 +164,61 @@ export default {
       }
       this.wavesurfer.playPause();
       this.isNowPlaying = !this.isNowPlaying;
+    },
+    analyzeAduioParagraph() {
+      let data = this.audioPeakData;
+      let startPoiter = 0;
+      let minTalkingPeakThreshold = 15; // 視為說話的閥值
+      let temp = [];
+
+      for (let endPointer = 0; endPointer < data.length; endPointer++) {
+        let dataAbs = Math.abs(data[endPointer]);
+        if (dataAbs < minTalkingPeakThreshold) {
+          if (startPoiter < endPointer) {
+            // stop talking
+            temp.push({
+              sp: startPoiter,
+              ep: endPointer,
+            });
+            startPoiter = endPointer + 1;
+          } else if (startPoiter >= endPointer) {
+            // still not talking
+            startPoiter++;
+          }
+        }
+      }
+
+      let pausePeakCount = 7; // 說話停頓許可Peak數
+      let result = [];
+      for (let endPointer = 0; endPointer < temp.length; endPointer++) {
+        if (endPointer == 0) {
+          result.push(temp[0]);
+        } else if (temp[endPointer].sp - result[result.length - 1].ep < pausePeakCount) {
+          result[result.length - 1].ep = temp[endPointer].ep;
+        } else {
+          result.push(temp[endPointer]);
+        }
+      }
+      this.analyzeAduioParagraphResult = result.map((d) => {
+        let st = this.parsePeaKIndexToTimeAsMs(d.sp);
+        let et = this.parsePeaKIndexToTimeAsMs(d.ep);
+        return {
+          startTime: st / 1000,
+          endTime: et / 1000,
+          during: (et - st) / 1000,
+        };
+      });
+    },
+    playFromTimeToTime(startTime, endTime) {
+      if (!this.isNowPlaying && this.isKeepUpdatePosition) {
+        this.setKeepUpdatePositionInterval();
+      }
+      let bufferTime = 0.1;
+      this.wavesurfer.play(startTime - bufferTime, endTime + bufferTime);
+      this.isNowPlaying = true;
+    },
+    parsePeaKIndexToTimeAsMs(peakIndex) {
+      return Math.round((peakIndex * this.wavesurfer.backend.buffer.duration * 1000) / this.audioPeakData.length);
     },
   },
 };
