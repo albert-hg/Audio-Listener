@@ -98,6 +98,7 @@ export default {
     setWavesurferOnFinish() {
       this.wavesurfer.on("finish", () => {
         console.debug("finish");
+        this.isNowPlaying = false;
         this.clearAllInterval();
       });
     },
