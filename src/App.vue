@@ -17,6 +17,19 @@
         <span v-if="isKeepUpdatePosition">取消定位</span>
         <span v-else>啟動定位</span>
       </button>
+      <button @click="analyzeAduioParagraph()">分析斷句</button>
+      <div>
+        <span>播放速度</span>
+        <input type="range" min="5" max="15" value="10" @change="setPlayRate($event.target.value)" />
+      </div>
+      <div>
+        <span>說話峰值(建議為8~15)</span>
+        <input type="number" v-model="audioMinTalkingPeakThreshold" />
+      </div>
+      <div>
+        <span>允許停頓毫秒數(建議為{{audioAllowTalkingPauseMillisecond}}毫秒)</span>
+        <input type="number" v-model="audioAllowTalkingPauseMillisecond" />
+      </div>
     </div>
     <div id="split-data-container" v-if="wavesurfer && wavesurfer.backend.buffer">
       <table>
@@ -58,6 +71,8 @@ export default {
       isKeepUpdatePosition: true,
       isNowPlaying: false,
       analyzeAduioParagraphResult: [],
+      audioMinTalkingPeakThreshold: 10,
+      audioAllowTalkingPauseMillisecond: 500,
     };
   },
   mounted() {
@@ -101,6 +116,9 @@ export default {
         };
         reader.readAsArrayBuffer(file);
       }
+    },
+    setPlayRate(evt) {
+      this.wavesurfer.setPlaybackRate(evt / 10);
     },
     setWavesurferOnWaveformReady() {
       let wavesurfer = this.wavesurfer;
@@ -168,7 +186,7 @@ export default {
     analyzeAduioParagraph() {
       let data = this.audioPeakData;
       let startPoiter = 0;
-      let minTalkingPeakThreshold = 15; // 視為說話的閥值
+      let minTalkingPeakThreshold = this.audioMinTalkingPeakThreshold; // 視為說話的閥值
       let temp = [];
 
       for (let endPointer = 0; endPointer < data.length; endPointer++) {
@@ -188,12 +206,12 @@ export default {
         }
       }
 
-      let pausePeakCount = 7; // 說話停頓許可Peak數
+      let allowTalkingPausePeadSize = (this.audioAllowTalkingPauseMillisecond * this.peakSizePerSec) / 1000; // 說話停頓許可Peak數
       let result = [];
       for (let endPointer = 0; endPointer < temp.length; endPointer++) {
         if (endPointer == 0) {
           result.push(temp[0]);
-        } else if (temp[endPointer].sp - result[result.length - 1].ep < pausePeakCount) {
+        } else if (temp[endPointer].sp - result[result.length - 1].ep < allowTalkingPausePeadSize) {
           result[result.length - 1].ep = temp[endPointer].ep;
         } else {
           result.push(temp[endPointer]);
