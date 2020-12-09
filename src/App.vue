@@ -13,6 +13,10 @@
         <span v-if="isNowPlaying">暫停</span>
         <span v-else>播放</span>
       </button>
+      <button type="button" @click="switchReplayMode()">
+        <span v-if="isReplayMode">關閉循環撥放</span>
+        <span v-else>開起循環撥放</span>
+      </button>
       <button type="button" @click="switchKeepUpdatePosition()">
         <span v-if="isKeepUpdatePosition">取消定位</span>
         <span v-else>啟動定位</span>
@@ -27,8 +31,12 @@
         <input type="number" v-model="audioMinTalkingPeakThreshold" />
       </div>
       <div>
-        <span>允許停頓毫秒數(建議為{{audioAllowTalkingPauseMillisecond}}毫秒)</span>
+        <span>允許停頓毫秒數(建議為500毫秒)</span>
         <input type="number" v-model="audioAllowTalkingPauseMillisecond" />
+      </div>
+      <div>
+        <span>播放緩衝毫秒數(建議為50毫秒)</span>
+        <input type="number" v-model="audioBufferTimeAsMillisecond" />
       </div>
     </div>
     <div id="split-data-container" v-if="wavesurfer && wavesurfer.backend.buffer">
@@ -70,9 +78,13 @@ export default {
         "https://stitcher.acast.com/livestitches/MTFBRjRFMUUtNjhCRi00MEFFLUJCQTRBMEMxQjNBNUY1Q0I=/f4d291fbf2aee915622fa5ce03f3b67d.mp3?ci=NZ32SCWYv2Zzy-sQo0jQlJjELe2yS_XABLwfqSvhzzgYCKnZUA2S6Q%3D%3D&pf=rss&range=bytes%3D0-&sv=sphinx%401.42.2&uid=c18ecc397c9a658b6b0fdaf1297d999e&Expires=1620033876&Signature=NGXOldiJfosLXcbkIFDDjWO%7EUFteynpvoagVOVj9X0v2ch3xPu8-Txyu-F%7EXApGgXw5s7fpt5zas1kTmsiB6FCXKhm87CG%7EHzUNqkV3ixNzU7Tm%7EGT-Abf%7EcHpX9V6aWAyWfatFY%7EICK3LyEFZZVOxXfzYcWLEomHsNYkQkgE94WzrJ9kxicjqyxDe16xNPioWTeUwatZAHhdF62MVUaVHKnT9qQPzFKxRYiQ6JESLz3EtusTt2ErOMedwHlZODYAzFpqzie%7ELJoVfqzsOMGBisCZIuqbzainmtvRnkPYMBKRexeKtbzzflI58Ensaex-g97pcyywEeA6T%7E8Fcs7bA__&Key-Pair-Id=APKAJXAFARUOTJQ3BLOQ",
       isKeepUpdatePosition: true,
       isNowPlaying: false,
+      isReplayMode: false,
       analyzeAduioParagraphResult: [],
       audioMinTalkingPeakThreshold: 10,
       audioAllowTalkingPauseMillisecond: 500,
+      audioBufferTimeAsMillisecond: 50,
+      audioPlayFromTime: 0,
+      audioPlayToTime: 0,
     };
   },
   mounted() {
@@ -90,7 +102,6 @@ export default {
         backend: "MediaElement",
         fillParent: false,
         minPxPerSec: this.peakSizePerSec,
-        // audioRate: 0.8,
       });
     },
     loadResource(res) {
@@ -138,13 +149,15 @@ export default {
         console.debug("pause");
         this.isNowPlaying = false;
         this.clearAllInterval();
+        if (this.isReplayMode) {
+          this.playFromTimeToTime(this.audioPlayFromTime, this.audioPlayToTime);
+        }
       });
     },
     setWavesurferOnFinish() {
       this.wavesurfer.on("finish", () => {
-        console.debug("finish");
-        this.isNowPlaying = false;
-        this.clearAllInterval();
+        // Cancel this field code. This is due to the event 'pause' will be triggered before on finish event.
+        // If you really want to do something on finished, add some procedure here.
       });
     },
     setKeepUpdatePositionInterval() {
@@ -178,10 +191,15 @@ export default {
     },
     switchPlayPause() {
       if (!this.isNowPlaying && this.isKeepUpdatePosition) {
+        this.audioPlayFromTime = 0;
+        this.audioPlayToTime = this.wavesurfer.getDuration();
         this.setKeepUpdatePositionInterval();
       }
       this.wavesurfer.playPause();
       this.isNowPlaying = !this.isNowPlaying;
+    },
+    switchReplayMode() {
+      this.isReplayMode = !this.isReplayMode;
     },
     analyzeAduioParagraph() {
       let data = this.audioPeakData;
@@ -231,7 +249,9 @@ export default {
       if (!this.isNowPlaying && this.isKeepUpdatePosition) {
         this.setKeepUpdatePositionInterval();
       }
-      let bufferTime = 0.1;
+      this.audioPlayFromTime = startTime;
+      this.audioPlayToTime = endTime;
+      let bufferTime = this.audioBufferTimeAsMillisecond / 1000;
       this.wavesurfer.play(startTime - bufferTime, endTime + bufferTime);
       this.isNowPlaying = true;
     },
