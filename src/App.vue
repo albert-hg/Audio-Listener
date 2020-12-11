@@ -1,6 +1,6 @@
 <template>
-  <div id="app">
-    <div class="res-setting-container d-flex flex-wrap justify-content-center align-items-center mb-2">
+  <div id="app" class="d-flex flex-column">
+    <div class="res-setting-container p-0 d-flex flex-wrap justify-content-center align-items-center mb-2 h-ft">
       <label class="r-s-c__title mr-2 mt-2" for="load-mode">Load Your Resource By</label>
       <select class="r-s-c__select-mode form-control form-control-sm mr-2" id="load-mode" v-model="audioInfos.loadMode">
         <option value="URL">URL</option>
@@ -20,7 +20,7 @@
       </div>
     </div>
 
-    <div class="accordion mb-3" id="analysis-setting-container">
+    <div class="accordion p-0 mb-3 h-ft" id="analysis-setting-container">
       <div class="card">
         <div
           id="headingOne"
@@ -49,53 +49,62 @@
       </div>
     </div>
 
-    <div id="js__waveform-container" class="mb-3">
+    <div id="js__waveform-container" class="p-0 mb-3">
       <div id="js__waveform" ref="waveform"></div>
     </div>
 
-    <div class="waveform-controller input-group" v-if="wavesurfer && wavesurfer.backend.buffer">
-      <button
-        type="button"
-        :class="['w-c__btn__play-pause btn btn-sm', playingController.isAudioPlayingNow ? 'btn-secondary' : 'btn-outline-primary']"
-        @click="switchPlayAndPause()"
-      >
-        <span v-if="playingController.isAudioPlayingNow">Pause</span>
-        <span v-else>Play</span>
-      </button>
-      <div class="w-c__btn__play-replay custom-control custom-checkbox d-flex align-items-center">
-        <input type="checkbox" id="replayMode" class="custom-control-input" v-model="playingController.isReplayMode" />
-        <label for="replayMode" class="custom-control-label">Replay</label>
-      </div>
-      <button type="button" @click="switchPositionCenterAlways()">
-        <span v-if="playingController.isPositionCenterAlways">取消定位</span>
-        <span v-else>啟動定位</span>
+    <div class="waveform-controller input-group p-0 mb-3" v-if="wavesurfer && wavesurfer.backend.buffer">
+      <button type="button" class="w-c__btn__play-pause btn btn-sm btn-primary mr-2 mb-1" @click="switchPlayAndPause()">
+        <font-awesome-icon v-if="playingController.isAudioPlayingNow" :icon="['fas', 'pause']" />
+        <font-awesome-icon v-else :icon="['fas', 'play']" />
       </button>
 
-      <div>
-        <span>播放速度</span>
+      <button
+        type="button"
+        :class="['w-c__btn__play-pause btn btn-sm mr-2 mb-1', playingController.isRepeatyMode ? 'btn-info' : 'btn-outline-secondary']"
+        @click="switchRepeatOrNot()"
+      >
+        <font-awesome-icon :icon="['fas', 'redo-alt']" />
+      </button>
+
+      <button
+        type="button"
+        :class="['w-c__btn__play-pause btn btn-sm mr-2 mb-1', playingController.isPositionCenterAlways ? 'btn-danger' : 'btn-outline-secondary']"
+        @click="switchPositionCenterAlways()"
+      >
+        <font-awesome-icon :icon="['fas', 'tags']" />
+      </button>
+
+      <div class="d-flex align-items-center btn-sm mr-2 mb-1">
+        <span class="mr-1">Speed</span>
         <input type="range" min="5" max="15" v-model="playingController.playingSpeedRate" @change="setPlayRate()" />
       </div>
-      <div>
-        <span>播放緩衝毫秒數(建議為50毫秒)</span>
-        <input type="number" min="1" v-model="playingController.playingBufferMillisecond" />
+
+      <div class="d-flex align-items-center btn-sm mr-2 mb-1">
+        <span class="mr-1">Buffer(ms)</span>
+        <input type="number" class="pt-0 pb-0" style="width: 70px;" min="1" v-model="playingController.playingBufferMillisecond" />
       </div>
     </div>
-    <div id="split-data-container" v-if="wavesurfer && wavesurfer.backend.buffer">
-      <table>
+
+    <div id="analysis-result-container" v-if="wavesurfer && wavesurfer.backend.buffer" class="p-0 flex-grow-1">
+      <table class="table table-sm table-hover table-striped">
         <thead>
           <tr>
             <th>From</th>
             <th>To</th>
             <th>Total Sec.</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="re in audioInfos.paragraghResult" :key="re.index">
-            <td>{{re.startTime}}</td>
-            <td>{{re.endTime}}</td>
+            <td>{{timeFormatterFormSec(re.startTime)}}</td>
+            <td>{{timeFormatterFormSec(re.endTime)}}</td>
             <td>{{re.during}}</td>
             <td>
-              <button type="button" @click="playParagraph(re)">播放</button>
+              <button type="button" class="btn btn-sm btn-secondary pt-0 pb-0" @click="playParagraph(re)">
+                <font-awesome-icon class="fa-xs" :icon="['fas', 'play']" />
+              </button>
             </td>
           </tr>
         </tbody>
@@ -131,7 +140,7 @@ export default {
         toTime: 0,
         isPositionCenterAlways: true,
         isAudioPlayingNow: false,
-        isReplayMode: false,
+        isRepeatyMode: false,
         playingBufferMillisecond: 50,
         playingSpeedRate: 10,
       },
@@ -178,7 +187,7 @@ export default {
     setWavesurferOnPause() {
       this.wavesurfer.on("pause", () => {
         this.unregisterPositionCenter();
-        if (this.playingController.isReplayMode && this.playingController.isAudioPlayingNow) {
+        if (this.playingController.isRepeatyMode && this.playingController.isAudioPlayingNow) {
           this.doPlay();
         } else {
           this.playingController.isAudioPlayingNow = false;
@@ -288,7 +297,7 @@ export default {
     doPause() {
       this.unregisterPositionCenter();
       this.playingController.isAudioPlayingNow = false;
-      // this.playingController.isReplayMode = false;
+      // this.playingController.isRepeatyMode = false;
       this.wavesurfer.pause();
     },
     registerPositionCenter() {
@@ -327,6 +336,25 @@ export default {
         this.playingController.isPositionCenterAlways = false;
       }
     },
+    switchRepeatOrNot() {
+      this.playingController.isRepeatyMode = !this.playingController.isRepeatyMode;
+    },
+    timeFormatterFormSec(sec_num) {
+      let hours = Math.floor(sec_num / 3600);
+      let minutes = Math.floor((sec_num - hours * 3600) / 60);
+      let seconds = sec_num - hours * 3600 - minutes * 60;
+      seconds = seconds.toFixed(3)
+      if (hours < 10) {
+        hours = "0" + hours;
+      }
+      if (minutes < 10) {
+        minutes = "0" + minutes;
+      }
+      if (seconds < 10) {
+        seconds = "0" + seconds;
+      }
+      return hours + ":" + minutes + ":" + seconds;
+    },
   },
 };
 </script>
@@ -338,12 +366,20 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  margin: 20px;
+  margin: 0px;
+  height: 97vh;
+  min-height: 600px;
+  padding: 20px;
+}
+
+.h-ft {
+  height: fit-content;
 }
 
 #js__waveform-container {
-  width: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-height: 130px;
 }
 #js__waveform {
   width: fit-content;
@@ -363,7 +399,11 @@ export default {
 .waveform-controller > .w-c__btn__play-pause {
   width: 4rem;
 }
-.waveform-controller > .w-c__btn__play-replay {
+.waveform-controller > .w-c__btn__play-repeat {
   width: 6rem;
+}
+
+#analysis-result-container {
+  overflow: auto;
 }
 </style>
