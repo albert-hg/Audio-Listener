@@ -1,38 +1,79 @@
 <template>
   <div id="app">
-    <div>
-      <input type="file" @change="browseAudioFile($event.target.files)" />
-      <input type="text" v-model="audioUrl" />
-      <button type="button" @click="loadResourceInWavesurfer(audioUrl)">載入網址資源</button>
+    <div class="res-setting-container d-flex flex-wrap justify-content-center align-items-center mb-2">
+      <label class="r-s-c__title mr-2 mt-2" for="load-mode">Load Your Resource By</label>
+      <select class="r-s-c__select-mode form-control form-control-sm mr-2" id="load-mode" v-model="audioInfos.loadMode">
+        <option value="URL">URL</option>
+        <option value="FILE">File</option>
+      </select>
+      <div class="r-s-c__load-res-container flex-grow-1">
+        <div v-if="audioInfos.loadMode === 'FILE'" class="custom-file">
+          <input type="file" id="load-mode__file" class="custom-file-input" @change="browseAudioFile($event.target.files)" />
+          <label class="custom-file-label text-left" for="load-mode__file">Choose file</label>
+        </div>
+        <div v-else-if="audioInfos.loadMode === 'URL'" class="input-group input-group-sm">
+          <input type="text" class="form-control" v-model="audioUrl" />
+          <div class="input-group-append" @click="loadResourceInWavesurfer(audioUrl)">
+            <span class="input-group-text">Load URL</span>
+          </div>
+        </div>
+      </div>
     </div>
-    <div id="js__waveform-container" style="width: 100%; overflow: auto;">
-      <div id="js__waveform" ref="waveform" style="width: fit-content;"></div>
+
+    <div class="accordion mb-3" id="analysis-setting-container">
+      <div class="card">
+        <div
+          id="headingOne"
+          class="card-header btn btn-link btn-sm p-2"
+          type="button"
+          data-toggle="collapse"
+          data-target="#collapseOne"
+          aria-expanded="true"
+          aria-controls="collapseOne"
+        >Advanced Setting of Audio Analysis</div>
+        <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#analysis-setting-container">
+          <div class="card-body p-3 text-left">
+            <div class="form-group">
+              <label class>說話峰值 (建議為8~15)</label>
+              <input type="number" class="form-control form-control-sm" min="1" v-model="analyzationController.thresholdForMinSpeakingPeakSize" />
+            </div>
+            <div class="form-group">
+              <label>允許停頓毫秒數 (建議為500毫秒)</label>
+              <input type="number" class="form-control form-control-sm" min="1" v-model="analyzationController.allowedPauseMillisecondsInSpeaking" />
+            </div>
+            <div class="form-group clearfix mb-0">
+              <button v-if="wavesurfer && wavesurfer.backend.buffer" class="btn btn-sm btn-info float-right" @click="analyzeAduioParagraph()">重新分析音檔</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div id="js__waveform-controller" v-if="wavesurfer && wavesurfer.backend.buffer">
-      <button type="button" @click="switchPlayAndPause()">
-        <span v-if="playingController.isAudioPlayingNow">暫停</span>
-        <span v-else>播放</span>
+
+    <div id="js__waveform-container" class="mb-3">
+      <div id="js__waveform" ref="waveform"></div>
+    </div>
+
+    <div class="waveform-controller input-group" v-if="wavesurfer && wavesurfer.backend.buffer">
+      <button
+        type="button"
+        :class="['w-c__btn__play-pause btn btn-sm', playingController.isAudioPlayingNow ? 'btn-secondary' : 'btn-outline-primary']"
+        @click="switchPlayAndPause()"
+      >
+        <span v-if="playingController.isAudioPlayingNow">Pause</span>
+        <span v-else>Play</span>
       </button>
-      <div>
-        <input type="checkbox" id="replayMode" v-model="playingController.isReplayMode" />
-        <label for="replayMode">循環撥放</label>
+      <div class="w-c__btn__play-replay custom-control custom-checkbox d-flex align-items-center">
+        <input type="checkbox" id="replayMode" class="custom-control-input" v-model="playingController.isReplayMode" />
+        <label for="replayMode" class="custom-control-label">Replay</label>
       </div>
       <button type="button" @click="switchPositionCenterAlways()">
         <span v-if="playingController.isPositionCenterAlways">取消定位</span>
         <span v-else>啟動定位</span>
       </button>
-      <button @click="analyzeAduioParagraph()">分析斷句</button>
+
       <div>
         <span>播放速度</span>
         <input type="range" min="5" max="15" v-model="playingController.playingSpeedRate" @change="setPlayRate()" />
-      </div>
-      <div>
-        <span>說話峰值(建議為8~15)</span>
-        <input type="number" min="1" v-model="analyzationController.thresholdForMinSpeakingPeakSize" />
-      </div>
-      <div>
-        <span>允許停頓毫秒數(建議為500毫秒)</span>
-        <input type="number" min="1" v-model="analyzationController.allowedPauseMillisecondsInSpeaking" />
       </div>
       <div>
         <span>播放緩衝毫秒數(建議為50毫秒)</span>
@@ -75,6 +116,7 @@ export default {
       audioUrl:
         "https://stitcher.acast.com/livestitches/MTFBRjRFMUUtNjhCRi00MEFFLUJCQTRBMEMxQjNBNUY1Q0I=/f4d291fbf2aee915622fa5ce03f3b67d.mp3?ci=NZ32SCWYv2Zzy-sQo0jQlJjELe2yS_XABLwfqSvhzzgYCKnZUA2S6Q%3D%3D&pf=rss&range=bytes%3D0-&sv=sphinx%401.42.2&uid=c18ecc397c9a658b6b0fdaf1297d999e&Expires=1620033876&Signature=NGXOldiJfosLXcbkIFDDjWO%7EUFteynpvoagVOVj9X0v2ch3xPu8-Txyu-F%7EXApGgXw5s7fpt5zas1kTmsiB6FCXKhm87CG%7EHzUNqkV3ixNzU7Tm%7EGT-Abf%7EcHpX9V6aWAyWfatFY%7EICK3LyEFZZVOxXfzYcWLEomHsNYkQkgE94WzrJ9kxicjqyxDe16xNPioWTeUwatZAHhdF62MVUaVHKnT9qQPzFKxRYiQ6JESLz3EtusTt2ErOMedwHlZODYAzFpqzie%7ELJoVfqzsOMGBisCZIuqbzainmtvRnkPYMBKRexeKtbzzflI58Ensaex-g97pcyywEeA6T%7E8Fcs7bA__&Key-Pair-Id=APKAJXAFARUOTJQ3BLOQ",
       audioInfos: {
+        loadMode: "URL",
         totalDurationTime: 0,
         peakNumberPerSecond: 40,
         originalPeakData: [],
@@ -296,6 +338,32 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  margin-top: 60px;
+  margin: 20px;
+}
+
+#js__waveform-container {
+  width: 100%;
+  overflow: auto;
+}
+#js__waveform {
+  width: fit-content;
+}
+
+.res-setting-container > .r-s-c__title {
+  min-width: fit-content;
+}
+.res-setting-container > .r-s-c__select-mode {
+  width: auto;
+}
+.res-setting-container > .r-s-c__load-res-container {
+  width: min-content;
+  min-width: 200px;
+}
+
+.waveform-controller > .w-c__btn__play-pause {
+  width: 4rem;
+}
+.waveform-controller > .w-c__btn__play-replay {
+  width: 6rem;
 }
 </style>
